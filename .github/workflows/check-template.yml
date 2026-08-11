@@ -6,24 +6,37 @@ jobs:
   check-template:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Check PR template
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const path = '.github/pull_request_template.md';
+            const normalize = value => value.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '');
+
             if (!fs.existsSync(path)) {
               throw new Error(`PR template not found at ${path}`);
             }
-            const requiredSections = [
-              '## 🤔 Problem',
-              '## 🧐​ Solution',
-              '## 🤨 Rationale',
-            ];
 
-            const usesTemplate = requiredSections.every(section => body.toLowerCase().includes(section.toLowerCase()));
+            const body = context.payload.pull_request?.body || '';
+            const template = fs.readFileSync(path, 'utf8');
+            const requiredSections = template
+              .split(/\r?\n/)
+              .map(line => line.trim())
+              .filter(line => line.startsWith('## '));
 
-            if (!usesTemplate) {
-              throw new Error(`PR template is missing required sections. Please ensure your PR description includes the following sections:\n${requiredSections.join('\n')}`);
+            if (requiredSections.length === 0) {
+              throw new Error(`PR template at ${path} does not contain any required "## " sections.`);
             }
-            core.setFailed('The PR description is missing the required template sections.');
+
+            const normalizedBody = normalize(body);
+            const missingSections = requiredSections.filter(section => !normalizedBody.includes(normalize(section)));
+
+            if (missingSections.length > 0) {
+              throw new Error(`PR template is missing required sections. Please ensure your PR description includes the following sections:\n${missingSections.join('\n')}`);
+            }
+
+            core.info('PR description includes all required template sections.');
