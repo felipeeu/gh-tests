@@ -1,0 +1,29 @@
+name: Check PR template
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+jobs:
+  check-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR template
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.github/pull_request_template.md';
+            if (!fs.existsSync(path)) {
+              throw new Error(`PR template not found at ${path}`);
+            }
+            const requiredSections = [
+              '## 🤔 Problem',
+              '## 🧐​ Solution',
+              '## 🤨 Rationale',
+            ];
+
+            const usesTemplate = requiredSections.every(section => body.toLowerCase().includes(section.toLowerCase()));
+
+            if (!usesTemplate) {
+              throw new Error(`PR template is missing required sections. Please ensure your PR description includes the following sections:\n${requiredSections.join('\n')}`);
+            }
+            core.setFailed('The PR description is missing the required template sections.');
